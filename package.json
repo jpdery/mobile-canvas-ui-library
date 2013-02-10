@@ -1,0 +1,26 @@
+{
+	"name": "mobkit",
+	"description": "Canvas based mobile application framework",
+	"version": "0.0.1",
+	"main": "./lib/main.js",
+	"license": "MIT",
+	"keywords": [],
+	"author": "Jean-Philippe Dery <jeanphilippe.dery@gmail.com>",
+
+	"dependencies": {
+		"event-util": "0.0.1",
+		"touch-util": "0.0.1",
+		"moofx": "3.1.0",
+		"prime": "git://github.com/mootools/prime.git",
+		"prime-util": "git://github.com/jpdery/prime-util.git"
+	},
+	"devDependencies": {
+		"expect.js": "0.2",
+		"mocha": "1.6",
+		"sinon": "1.5.2",
+		"wrapup": "0.10.3"
+	},
+	"engines": {
+		"node": "*"
+	}
+}
