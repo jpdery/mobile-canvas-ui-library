@@ -16,16 +16,16 @@
         var Control = require("13");
         var Button = require("15");
         var Emitter = require("9");
-        var Event = require("s");
+        var Event = require("e");
         var TouchEvent = require("u");
         var Touch = require("t");
-        var Rect = require("i");
-        var Size = require("k");
-        var Point = require("j");
-        var View = require("l");
-        var ViewStyle = require("n");
-        var ViewRenderer = require("o");
-        var ViewController = require("q");
+        var Rect = require("j");
+        var Size = require("l");
+        var Point = require("k");
+        var View = require("m");
+        var ViewStyle = require("o");
+        var ViewRenderer = require("p");
+        var ViewController = require("r");
         global.example = function() {
             var prime = require("3");
             var fx = require("16");
@@ -45,7 +45,7 @@
                     this.button.origin.x = this.view.size.x / 2 - this.button.size.x / 2;
                     this.button.origin.y = this.view.size.y / 2 - this.button.size.y / 2;
                     this.button.label = "Tap";
-                    this.view.addChildView(this.button);
+                    this.view.addChild(this.button);
                     this.button.on("touchend", this.bound("onButtonTap"));
                 },
                 onButtonTap: function() {
@@ -55,7 +55,7 @@
                     view.size.x = 320;
                     view.size.y = 480;
                     view.style.backgroundColor = "#67c0ea";
-                    this.view.addChildView(view);
+                    this.view.addChild(view);
                     var move = fx(function(value) {
                         view.origin.x = value;
                     });
@@ -72,7 +72,7 @@
             });
             var root = new RootViewController;
             var app = new Application;
-            app.view.addChildView(root.view);
+            app.view.addChild(root.view);
         };
     },
     "1": function(require, module, exports, global) {
@@ -85,13 +85,13 @@
         var array = require("4");
         var Map = require("8");
         var Emitter = require("9");
-        var Rect = require("i");
-        var Size = require("k");
-        var Point = require("j");
-        var View = require("l");
-        var ViewRenderer = require("o");
-        var ViewController = require("q");
-        var Event = require("s");
+        var Rect = require("j");
+        var Size = require("l");
+        var Point = require("k");
+        var View = require("m");
+        var ViewRenderer = require("p");
+        var ViewController = require("r");
+        var Event = require("e");
         var Touch = require("t");
         var TouchEvent = require("u");
         require("v");
@@ -136,7 +136,7 @@
                     }
                 }, this);
                 changedTouches.each(function(touches, view) {
-                    view.emit("touchstart", touches, new TouchEvent("touchstart", true, this.__userTouches.values()));
+                    view.emit(new TouchEvent("touchstart", true, this.__userTouches.values()), touches);
                 }, this);
             },
             __onTouchMove: function(e) {
@@ -155,7 +155,7 @@
                     array.push(touches, touch);
                 }, this);
                 changedTouches.each(function(touches, view) {
-                    view.emit("touchmove", touches, new TouchEvent("touchmove", true, this.__userTouches.values()));
+                    view.emit(new TouchEvent("touchmove", true, this.__userTouches.values()), touches);
                 }, this);
             },
             __onTouchEnd: function(e) {
@@ -176,7 +176,7 @@
                     this.__viewTouches.remove(t);
                 }, this);
                 changedTouches.each(function(touches, view) {
-                    view.emit("touchend", touches, new TouchEvent("touchend", true, this.__userTouches.values()));
+                    view.emit(new TouchEvent("touchend", true, this.__userTouches.values()), touches);
                 }, this);
             }
         });
@@ -505,33 +505,29 @@
         var mixin = require("d");
         var Event = require("e");
         require("b");
-        require("f");
+        require("g");
         var Emitter = module.exports = prime({
-            constructor: function() {
-                this.__listeners = {};
-                this.__responder = null;
-                return this;
-            },
             addListener: function(type, listener) {
                 type = type.toLowerCase();
-                var listeners = this.__listeners[type];
-                if (listeners === undefined) {
-                    listeners = this.__listeners[type] = [];
+                var listeners = this.__listeners || (this.__listeners = {});
+                var events = listeners[type];
+                if (events === undefined) {
+                    events = listeners[type] = [];
                 }
-                if (array.index(listeners, listener) === null) array.push(listeners, listener);
+                if (array.index(events, listener) === null) array.push(events, listener);
                 return this;
             },
             hasListener: function(type, listener) {
                 type = type.toLowerCase();
-                var listeners = this.__listeners[type];
-                if (listeners === undefined) return this;
-                return !!array.index(listeners, listener);
+                var events = this.__listeners[type];
+                if (events === undefined) return this;
+                return !!array.index(events, listener);
             },
             removeListener: function(type, listener) {
                 type = type.toLowerCase();
-                var listeners = this.__listeners[type];
-                if (listeners === undefined) return this;
-                array.remove(listeners, listener);
+                var events = this.__listeners[type];
+                if (events === undefined) return this;
+                array.remove(events, listener);
                 return this;
             },
             removeListeners: function(type) {
@@ -550,34 +546,25 @@
                 return this.removeListener.apply(this, arguments);
             },
             once: function(type, listener) {},
-            emit: function() {
+            emit: function(event) {
+                if (typeof event === "string") {
+                    event = new Event(event, false);
+                }
+                var type = event.type;
                 var args = array.slice(arguments, 1);
-                var type = "";
-                var event = null;
-                if (typeof args[0] === "string") {
-                    type = args[0].toLowerCase();
-                }
-                var event = args[args.length - 1];
-                if (event instanceof Event) {
-                    type = event.type;
-                } else {
-                    event = new Event(type, false);
-                    args.push(event);
-                }
-                if (event.__source === null) {
-                    event.__source = this;
-                }
-                var listeners = this.__listeners[type];
-                if (listeners) {
-                    for (var i = 0, l = listeners.length; i < l; i++) {
-                        listeners[i].apply(this, args);
+                if (event.source === null) event.__setSource(this);
+                var listeners = this.__listeners || (this.__listeners = {});
+                var events = listeners[type];
+                if (events) {
+                    for (var i = 0, l = events.length; i < l; i++) {
+                        events[i].apply(this, args);
                     }
                 }
                 if (!event.bubbles || event.stopped) return this;
                 var responder = this.__responder;
                 if (responder) {
-                    array.push(args, type);
-                    responder.emit.apply(responder, args);
+                    arguments[0] = event;
+                    responder.emit.apply(responder, arguments);
                 }
                 return this;
             },
@@ -647,10 +634,14 @@
     },
     e: function(require, module, exports, global) {
         "use strict";
+        module.exports = require("f");
+    },
+    f: function(require, module, exports, global) {
+        "use strict";
         var prime = require("3");
         var Event = module.exports = prime({
             constructor: function(type, bubbles) {
-                this.__type = type;
+                this.__type = type.toLowerCase();
                 this.__source = null;
                 this.__bubbles = bubbles || true;
                 this.__stopped = false;
@@ -660,6 +651,9 @@
             stop: function() {
                 this.__stopped = true;
                 return this;
+            },
+            __setSource: function(source) {
+                this.__source = source;
             }
         });
         prime.define(Event.prototype, "type", {
@@ -688,10 +682,10 @@
             }
         });
     },
-    f: function(require, module, exports, global) {
+    g: function(require, module, exports, global) {
         "use strict";
         var array = require("5");
-        var number = require("g");
+        var number = require("h");
         array.implement({
             clean: function() {
                 return array.filter(this, function(item) {
@@ -750,9 +744,9 @@
         });
         module.exports = array;
     },
-    g: function(require, module, exports, global) {
+    h: function(require, module, exports, global) {
         "use strict";
-        var number = require("h");
+        var number = require("i");
         module.exports = number.implement({
             limit: function(min, max) {
                 return Math.min(max, Math.max(min, this));
@@ -770,18 +764,18 @@
             }
         });
     },
-    h: function(require, module, exports, global) {
+    i: function(require, module, exports, global) {
         "use strict";
         var number = require("6")["number"];
         var names = "toExponential,toFixed,toLocaleString,toPrecision,toString,valueOf".split(",");
         for (var methods = {}, i = 0, name, method; name = names[i++]; ) if (method = Number.prototype[name]) methods[name] = method;
         module.exports = number.implement(methods);
     },
-    i: function(require, module, exports, global) {
+    j: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
-        var Point = require("j");
-        var Size = require("k");
+        var Point = require("k");
+        var Size = require("l");
         var Rect = module.exports = prime({
             constructor: function(x, y, w, h) {
                 var rect = arguments[0];
@@ -824,7 +818,7 @@
             return new Rect(x1, y1, x2 - x1, y2 - y1);
         };
     },
-    j: function(require, module, exports, global) {
+    k: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var Emitter = require("9");
@@ -865,7 +859,7 @@
             }
         });
     },
-    k: function(require, module, exports, global) {
+    l: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var Emitter = require("9");
@@ -906,46 +900,40 @@
             }
         });
     },
-    l: function(require, module, exports, global) {
-        "use strict";
-        module.exports = require("m");
-    },
     m: function(require, module, exports, global) {
+        "use strict";
+        module.exports = require("n");
+    },
+    n: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var array = require("4");
         var Emitter = require("9");
-        var Rect = require("i");
-        var Size = require("k");
-        var Point = require("j");
-        var ViewStyle = require("n");
-        var ViewRenderer = require("o");
-        require("f");
+        var Rect = require("j");
+        var Size = require("l");
+        var Point = require("k");
+        var ViewStyle = require("o");
+        var ViewRenderer = require("p");
+        require("g");
         var View = module.exports = prime({
             inherits: Emitter,
             constructor: function(name) {
-                View.parent.constructor.call(this);
                 this.__name = name;
                 this.__style = new ViewStyle(this);
                 this.__opacity = 1;
                 this.__visible = true;
-                this.__origin = new Point(0, 0);
-                this.__origin.on("propertychange", this.bound("__onOriginChange"));
-                this.__center = new Point(0, 0);
-                this.__center.on("propertychange", this.bound("__onCenterChange"));
-                this.__size = new Size;
-                this.__size.on("propertychange", this.bound("__onSizeChange"));
-                this.__parentView = null;
-                this.__masterView = null;
-                this.__childViews = [];
-                this.on("addtomasterview", this.bound("__onAddToMasterView"));
-                this.on("removefrommasterview", this.bound("__onRemoveFromMasterView"));
-                this.on("addchildview", this.bound("onAddChildView"));
-                this.on("removechildview", this.bound("onRemoveChildView"));
-                this.on("addtoparentview", this.bound("onAddToParentView"));
-                this.on("addtomasterview", this.bound("onAddToMasterView"));
-                this.on("removefromparentview", this.bound("onRemoveFromParentView"));
-                this.on("removefrommasterview", this.bound("onRemoveFromMasterView"));
+                this.__parent = null;
+                this.__window = null;
+                this.__children = [];
+                this.origin = new Point(0, 0);
+                this.center = new Point(0, 0);
+                this.size = new Size;
+                this.on("add", this.bound("onAdd"));
+                this.on("remove", this.bound("onRemove"));
+                this.on("addtoparent", this.bound("onAddToParent"));
+                this.on("addtowindow", this.bound("onAddToWindow"));
+                this.on("removefromparent", this.bound("onRemoveFromParent"));
+                this.on("removefromwindow", this.bound("onRemoveFromWindow"));
                 this.on("touchcancel", this.bound("onTouchCancel"));
                 this.on("touchstart", this.bound("onTouchStart"));
                 this.on("touchmove", this.bound("onTouchMove"));
@@ -953,29 +941,27 @@
                 return this;
             },
             destroy: function() {
-                this.removeFromParentView();
+                this.removeFromParent();
                 this.__name = null;
                 this.__style.destroy();
                 this.__style = null;
                 this.__opacity = null;
                 this.__visible = null;
                 this.__origin.on("propertychange", this.bound("__onOriginChange"));
-                this.__origin = null;
                 this.__center.on("propertychange", this.bound("__onCenterChange"));
-                this.__center = null;
                 this.__size.on("propertychange", this.bound("__onSizeChange"));
+                this.__origin = null;
+                this.__center = null;
                 this.__size = null;
-                this.__parentView = null;
-                this.__masterView = null;
-                this.__childViews = null;
-                this.off("addtomasterview", this.bound("__onAddToMasterView"));
-                this.off("removefrommasterview", this.bound("__onRemoveFromMasterView"));
-                this.off("addchildview", this.bound("onAddChildView"));
-                this.off("removechildview", this.bound("onRemoveChildView"));
-                this.off("addtoparentview", this.bound("onAddToParentView"));
-                this.off("addtomasterview", this.bound("onAddToMasterView"));
-                this.off("removefromparentview", this.bound("onRemoveFromParentView"));
-                this.off("removefrommasterview", this.bound("onRemoveFromMasterView"));
+                this.__parent = null;
+                this.__window = null;
+                this.__children = null;
+                this.off("add", this.bound("onAdd"));
+                this.off("remove", this.bound("onRemove"));
+                this.off("addtoparent", this.bound("onAddToParent"));
+                this.off("addtowindow", this.bound("onAddToWindow"));
+                this.off("removefromparent", this.bound("onRemoveFromParent"));
+                this.off("removefromwindow", this.bound("onRemoveFromWindow"));
                 this.off("touchcancel", this.bound("onTouchCancel"));
                 this.off("touchstart", this.bound("onTouchStart"));
                 this.off("touchmove", this.bound("onTouchMove"));
@@ -1010,72 +996,70 @@
                 this.size = size;
                 return this;
             },
-            addChildView: function(view) {
-                return this.addChildViewAt(view, this.__childViews.length);
+            addChild: function(view) {
+                return this.addChildAt(view, this.__children.length);
             },
-            addChildViewAt: function(view, index) {
-                var children = this.__childViews;
+            addChildAt: function(view, index) {
+                var children = this.__children;
                 if (index > children.length || index < 0) return;
-                if (view.parentView) {
-                    view.removeFromParentView();
-                }
+                view.removeFromParent();
                 array.splice(children, index, 1, view);
                 view.responder = this;
-                view.__setParentView(this);
-                view.__setMasterView(this.masterView);
-                this.emit("addchildview", view);
+                view.__setParent(this);
+                view.__setWindow(this.window);
+                this.emit("add", view);
                 return this.reflow();
             },
-            addChildViewBefore: function(child, before) {
-                var index = this.getChildViewIndex(before);
+            addChildBefore: function(child, before) {
+                var index = this.getChildIndex(before);
                 if (index === null) return this;
-                return this.addChildViewAt(child, index);
+                return this.addChildAt(child, index);
             },
-            addChildViewAfter: function(child, after) {
-                var index = this.getChildViewIndex(before);
+            addChildAfter: function(child, after) {
+                var index = this.getChildIndex(before);
                 if (index === null) return this;
-                return this.addChildViewAt(child, index + 1);
+                return this.addChildAt(child, index + 1);
             },
-            removeChildView: function(child, destroy) {
-                var index = this.getChildViewIndex(child);
+            removeChild: function(child, destroy) {
+                var index = this.getChildIndex(child);
                 if (index === null) return this;
-                return this.removeChildViewAt(index, destroy);
+                return this.removeChildAt(index, destroy);
             },
-            removeChildViewAt: function(index, destroy) {
-                var children = this.__childViews;
+            removeChildAt: function(index, destroy) {
+                var children = this.__children;
                 var view = children[index];
                 if (view === undefined) return this;
                 array.splice(children, index, 1);
-                view.__setParentView(null);
-                view.__setMasterView(null);
+                view.__setParent(null);
+                view.__setWindow(null);
                 view.responder = null;
-                this.emit("removechildview", view);
+                this.emit("remove", view);
                 if (destroy) view.destroy();
                 return this.reflow();
             },
-            removeFromParentView: function(destroy) {
-                if (this.__parentView) {
-                    this.__parentView.removeChildView(this, destroy);
+            removeFromParent: function(destroy) {
+                if (this.__parent) {
+                    this.__parent.removeChild(this, destroy);
                 }
                 return this;
             },
-            getChildView: function(name) {
-                return array.find(this.__childViews, function(view) {
+            getChild: function(name) {
+                return array.find(this.__children, function(view) {
                     return view.name === name;
                 });
             },
-            getChildViewAt: function(index) {
-                return this.__childViews[index] || null;
+            getChildAt: function(index) {
+                return this.__children[index] || null;
             },
-            getChildViewByTypeAt: function(type, index) {
+            getChildByTypeAt: function(type, index) {
                 return this;
             },
-            getChildViewIndex: function(child) {
-                return array.indexOf(this.__childViews, child);
+            getChildIndex: function(child) {
+                return array.indexOf(this.__children, child);
             },
             getViewAtPoint: function(x, y) {
                 if (this.contains(x, y) === false) return null;
-                var children = this.__childViews;
+                var children = this.__children;
                 for (var i = children.length - 1; i >= 0; i--) {
                     var child = children[i];
                     if (child.contains(x, y)) {
@@ -1111,37 +1095,37 @@
                 ViewRenderer.reflow(this);
                 return this;
             },
-            onAddChildView: function(view) {},
-            onRemoveChildView: function(view) {},
-            onAddToParentView: function(parentView) {},
-            onAddToMasterView: function(masterView) {},
-            onRemoveFromParentView: function(parentView) {},
-            onRemoveFromMasterView: function(masterView) {},
+            onAdd: function(view) {},
+            onRemove: function(view) {},
+            onAddToParent: function(parent) {},
+            onAddToWindow: function(masterView) {},
+            onRemoveFromParent: function(parent) {},
+            onRemoveFromWindow: function(masterView) {},
             onTouchCancel: function(e) {},
             onTouchStart: function(e) {},
             onTouchMove: function(e) {},
             onTouchEnd: function(e) {},
-            __setParentView: function(value) {
-                var parent = this.__parentView;
+            __setParent: function(value) {
+                var parent = this.__parent;
                 if (parent && value === null) {
-                    this.__parentView = value;
-                    return this.emit("removefromparentview", parent);
+                    this.__parent = value;
+                    return this.emit("removefromparent", parent);
                 }
                 if (parent === null && value) {
-                    this.__parentView = value;
-                    return this.emit("addtoparentview", parent);
+                    this.__parent = value;
+                    return this.emit("addtoparent", parent);
                 }
                 return this;
             },
-            __setMasterView: function(value) {
-                var master = this.__masterView;
+            __setWindow: function(value) {
+                var master = this.__window;
                 if (master && value === null) {
-                    this.__masterView = value;
-                    return this.emit("removefrommasterview", master);
+                    this.__window = value;
+                    return this.emit("removefromwindow", master);
                 }
                 if (master === null && value) {
-                    this.__masterView = value;
-                    return this.emit("addtomasterview", master);
+                    this.__window = value;
+                    return this.emit("addtowindow", master);
                 }
                 return this;
             },
@@ -1184,13 +1168,13 @@
                 }
                 this.reflow();
             },
-            __onAddToMasterView: function(masterView) {
-                this.__masterView = masterView;
-                array.invoke(this.__childViews, "emit", "addtomasterview", masterView);
+            __onAddToWindow: function(masterView) {
+                this.__window = masterView;
+                array.invoke(this.__children, "emit", "addtowindow", masterView);
             },
-            __onRemoveFromMasterView: function(masterView) {
-                this.__masterView = null;
-                array.invoke(this.__childViews, "emit", "removefrommasterview", masterView);
+            __onRemoveFromWindow: function(masterView) {
+                this.__window = null;
+                array.invoke(this.__children, "emit", "removefromwindow", masterView);
             }
         });
         prime.define(View.prototype, "name", {
@@ -1200,11 +1184,16 @@
         });
         prime.define(View.prototype, "size", {
             set: function(value) {
+                var func = this.bound("__onSizeChange");
                 var size = this.__size;
-                if (size.x === value.x && size.y === value.y) return;
-                size.x = value.x;
-                size.y = value.y;
-                this.emit("resize");
+                if (size) {
+                    size.off("propertychange", func);
+                }
+                size = this.__size = value;
+                size.on("propertychange", func);
+                if (size.x !== value.x || size.y !== value.y) {
+                    this.emit("resize").reflow();
+                }
             },
             get: function() {
                 return this.__size;
@@ -1212,11 +1201,16 @@
         });
         prime.define(View.prototype, "origin", {
             set: function(value) {
+                var func = this.bound("__onOriginChange");
                 var origin = this.__origin;
-                if (origin.x === value.x && origin.y === value.y) return;
-                origin.x = value.x;
-                origin.y = value.y;
-                this.emit("move");
+                if (origin) {
+                    origin.off("propertychange", func);
+                }
+                origin = this.__origin = value;
+                origin.on("propertychange", func);
+                if (origin.x !== value.x || origin.y !== value.y) {
+                    this.emit("move").reflow();
+                }
             },
             get: function() {
                 return this.__origin;
@@ -1224,11 +1218,16 @@
         });
         prime.define(View.prototype, "center", {
             set: function(value) {
+                var func = this.bound("__onCenterChange");
                 var center = this.__center;
-                if (center.x === value.x && center.y === value.y) return;
-                center.x = value.x;
-                center.y = value.y;
-                this.emit("move");
+                if (center) {
+                    center.off("propertychange", func);
+                }
+                center = this.__center = value;
+                center.on("propertychange", func);
+                if (center.x !== value.x || center.y !== value.y) {
+                    this.emit("move").reflow();
+                }
             },
             get: function() {
                 return this.__center;
@@ -1259,23 +1258,30 @@
             }
         });
         prime.define(View.prototype, "style", {
-            set: function(value) {},
+            set: function(value) {
+                this.__style = value;
+            },
             get: function() {
                 return this.__style;
             }
         });
-        prime.define(View.prototype, "parentView", {
+        prime.define(View.prototype, "parent", {
             get: function() {
-                return this.__parentView || null;
+                return this.__parent;
             }
         });
-        prime.define(View.prototype, "childViews", {
+        prime.define(View.prototype, "window", {
             get: function() {
-                return array.slice(this.__childViews);
+                return this.__window;
+            }
+        });
+        prime.define(View.prototype, "children", {
+            get: function() {
+                return array.slice(this.__children);
             }
         });
     },
-    n: function(require, module, exports, global) {
+    o: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var array = require("4");
@@ -1346,15 +1352,15 @@
             }
         });
     },
-    o: function(require, module, exports, global) {
+    p: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var Map = require("8");
-        var requestFrame = require("p").request;
-        var cancelFrame = require("p").cancel;
-        var Rect = require("i");
-        var Size = require("k");
-        var Point = require("j");
+        var requestFrame = require("q").request;
+        var cancelFrame = require("q").cancel;
+        var Rect = require("j");
+        var Size = require("l");
+        var Point = require("k");
         var Emitter = require("9");
         var buffers = new Map;
         var redraws = new Map;
@@ -1423,7 +1429,8 @@
                     self.__context.save();
                     self.__context.globalAlpha = view.opacity;
                     self.__context.drawImage(buffer, 0, 0, view.size.x, view.size.y, origin.x, origin.y, view.size.x, view.size.y);
-                    for (var i = 0; i < view.childViews.length; i++) paint(view.childViews[i], origin);
+                    var children = view.children;
+                    for (var i = 0; i < children.length; i++) paint(children[i], origin);
                     self.__context.restore();
                 };
                 paint(this.__view, new Point);
@@ -1435,8 +1442,8 @@
                 return this.__canvas;
             }
         });
-        var getRootView = function(view) {
-            while (view.parentView) view = view.parentView;
+        var root = function(view) {
+            while (view.parent) view = view.parent;
             return view;
         };
         ViewRenderer.create = function(view) {
@@ -1449,7 +1456,7 @@
             return instance;
         };
         ViewRenderer.get = function(view) {
-            var instance = instances.get(getRootView(view));
+            var instance = instances.get(root(view));
             if (instance) return instance;
             return null;
         };
@@ -1468,11 +1475,16 @@
             return this;
         };
         ViewRenderer.free = function(view) {
+            var buffer = buffers.get(view);
+            if (buffer) {
+                buffer.width = 0;
+                bugger.height = 0;
+            }
             buffers.remove(view);
             redraws.remove(view);
         };
     },
-    p: function(require, module, exports, global) {
+    q: function(require, module, exports, global) {
         "use strict";
         var array = require("5");
         var requestFrame = global.requestAnimationFrame || global.webkitRequestAnimationFrame || global.mozRequestAnimationFrame || global.oRequestAnimationFrame || global.msRequestAnimationFrame || function(callback) {
@@ -1497,16 +1509,16 @@
         exports.request = request;
         exports.cancel = cancel;
     },
-    q: function(require, module, exports, global) {
-        "use strict";
-        module.exports = require("r");
-    },
     r: function(require, module, exports, global) {
+        "use strict";
+        module.exports = require("s");
+    },
+    s: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var array = require("4");
         var Emitter = require("9");
-        var View = require("l");
+        var View = require("m");
         var ViewController = module.exports = prime({
             inherits: Emitter,
             constructor: function() {
@@ -1542,14 +1554,10 @@
             }
         });
     },
-    s: function(require, module, exports, global) {
-        "use strict";
-        module.exports = require("e");
-    },
     t: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
-        var Point = require("j");
+        var Point = require("k");
         var Touch = module.exports = prime({
             constructor: function(target, x, y) {
                 this.__identifier = Date.now();
@@ -1586,7 +1594,7 @@
         "use strict";
         var prime = require("3");
         var array = require("4");
-        var Event = require("e");
+        var Event = require("f");
         var TouchEvent = module.exports = prime({
             inherits: Event,
             constructor: function(type, bubbles, touches) {
@@ -2207,7 +2215,7 @@
         "use strict";
         var prime = require("3");
         var array = require("4");
-        var View = require("l");
+        var View = require("m");
         var Control = module.exports = prime({
             inherits: View
         });
@@ -2251,7 +2259,7 @@
     },
     "16": function(require, module, exports, global) {
         "use strict";
-        var prime = require("3"), requestFrame = require("p").request, bezier = require("17");
+        var prime = require("3"), requestFrame = require("q").request, bezier = require("17");
         var map = require("5").map;
         var sDuration = "([\\d.]+)(s|ms)?", sCubicBezier = "cubic-bezier\\(([-.\\d]+),([-.\\d]+),([-.\\d]+),([-.\\d]+)\\)";
         var rDuration = RegExp(sDuration), rCubicBezier = RegExp(sCubicBezier), rgCubicBezier = RegExp(sCubicBezier, "g");
