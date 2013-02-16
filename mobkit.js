@@ -13,22 +13,22 @@
     "0": function(require, module, exports, global) {
         "use strict";
         var Application = require("1");
-        var Control = require("13");
-        var Button = require("15");
+        var Control = require("14");
+        var Button = require("16");
         var Emitter = require("9");
         var Event = require("e");
-        var TouchEvent = require("u");
-        var Touch = require("t");
+        var TouchEvent = require("v");
+        var Touch = require("u");
         var Rect = require("j");
-        var Size = require("l");
+        var Size = require("m");
         var Point = require("k");
-        var View = require("m");
-        var ViewStyle = require("o");
-        var ViewRenderer = require("p");
-        var ViewController = require("r");
+        var View = require("n");
+        var ViewStyle = require("p");
+        var ViewRenderer = require("q");
+        var ViewController = require("s");
         global.example = function() {
             var prime = require("3");
-            var fx = require("16");
+            var fx = require("17");
             var RootViewController = prime({
                 inherits: ViewController,
                 loadView: function() {
@@ -86,16 +86,16 @@
         var Map = require("8");
         var Emitter = require("9");
         var Rect = require("j");
-        var Size = require("l");
+        var Size = require("m");
         var Point = require("k");
-        var View = require("m");
-        var ViewRenderer = require("p");
-        var ViewController = require("r");
+        var View = require("n");
+        var ViewRenderer = require("q");
+        var ViewController = require("s");
         var Event = require("e");
-        var Touch = require("t");
-        var TouchEvent = require("u");
-        require("v");
-        require("10");
+        var Touch = require("u");
+        var TouchEvent = require("v");
+        require("w");
+        require("11");
         var ApplicationController = module.exports = prime({
             inherits: ViewController,
             constructor: function(size) {
@@ -774,8 +774,11 @@
     j: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
+        var mixin = require("d");
         var Point = require("k");
-        var Size = require("l");
+        var Size = require("m");
+        var Emitter = require("9");
+        var Properties = require("l");
         var Rect = module.exports = prime({
             constructor: function(x, y, w, h) {
                 var rect = arguments[0];
@@ -785,29 +788,21 @@
                     w = rect.size.x;
                     h = rect.size.y;
                 }
-                this.__origin = new Point(x, y);
-                this.__size = new Size(w, h);
+                this.origin = new Point(x, y);
+                this.size = new Size(w, h);
                 return this;
             }
         });
-        prime.define(Rect.prototype, "origin", {
-            set: function(value) {
-                var origin = this.__origin;
-                origin.x = value.x;
-                origin.y = value.y;
-            },
-            get: function() {
-                return new Point(this.__origin);
+        mixin(Rect, Emitter);
+        mixin(Rect, Properties);
+        Properties.define(Rect, "origin", {
+            value: function() {
+                return new Point(0, 0);
             }
         });
-        prime.define(Rect.prototype, "size", {
-            set: function(value) {
-                var size = this.__size;
-                size.x = value.x;
-                size.y = value.y;
-            },
-            get: function() {
-                return new Size(this.__size);
+        Properties.define(Rect, "size", {
+            value: function() {
+                return new Size(0, 0);
             }
         });
         Rect.union = function(r1, r2) {
@@ -821,99 +816,126 @@
     k: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
+        var mixin = require("d");
         var Emitter = require("9");
+        var Properties = require("l");
         var Point = module.exports = prime({
-            inherits: Emitter,
             constructor: function(x, y) {
-                Point.parent.constructor.call(this);
                 var point = arguments[0];
                 if (point instanceof Point) {
                     x = point.x;
                     y = point.y;
                 }
-                this.__x = x || 0;
-                this.__y = y || 0;
+                this.x = x || 0;
+                this.y = y || 0;
                 return this;
             }
         });
-        prime.define(Point.prototype, "x", {
-            set: function(value) {
-                if (this.__x !== value) {
-                    this.__x = value;
-                    this.emit("propertychange", "x", value);
-                }
-            },
-            get: function() {
-                return this.__x;
-            }
+        mixin(Point, Emitter);
+        mixin(Point, Properties);
+        Properties.define(Point, "x", {
+            value: 0
         });
-        prime.define(Point.prototype, "y", {
-            set: function(value) {
-                if (this.__y !== value) {
-                    this.__y = value;
-                    this.emit("propertychange", "y", value);
-                }
-            },
-            get: function() {
-                return this.__y;
-            }
+        Properties.define(Point, "y", {
+            value: 0
         });
     },
     l: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
+        var mixin = require("d");
+        var Properties = module.exports = prime({});
+        Properties.define = function(prime, name, descriptor) {
+            var parentSetter = null;
+            var parentGetter = null;
+            var parent = prime.parent;
+            if (parent) {
+                var parentDescriptor = Object.getOwnPropertyDescriptor(parent, name);
+                if (parentDescriptor) {
+                    parentSetter = parent.set;
+                    parentGetter = parent.get;
+                }
+            }
+            descriptor = descriptor || {};
+            var proto = prime.prototype || prime;
+            var bound = descriptor.bound || "__" + name;
+            var value = descriptor.value || null;
+            var write = descriptor.writable || true;
+            var onSet = descriptor.onSet || function() {};
+            var onGet = descriptor.onGet || function() {};
+            if (!typeof value === "function") {
+                value = function() {
+                    return value;
+                };
+            }
+            var setter = function(value) {
+                if (!write) throw new Error("Property " + name + " is read-only");
+                var current = this[bound];
+                var changed = onSet.call(this, value, current, parentSetter);
+                if (changed === undefined) {
+                    changed = value;
+                }
+                if (current === changed) return;
+                this[bound] = changed;
+                if (this.emit) {
+                    this.emit("propertychange", name, changed);
+                }
+            };
+            var getter = function() {
+                var current = bound in this ? this[bound] : this[bound] = value.call(this);
+                var changed = onGet.call(this, current, parentGetter);
+                if (changed == undefined) {
+                    changed = current;
+                }
+                return changed;
+            };
+            Object.defineProperty(proto, name, {
+                set: setter,
+                get: getter
+            });
+        };
+    },
+    m: function(require, module, exports, global) {
+        "use strict";
+        var prime = require("3");
+        var mixin = require("d");
         var Emitter = require("9");
+        var Properties = require("l");
         var Size = module.exports = prime({
-            inherits: Emitter,
             constructor: function(x, y) {
-                Size.parent.constructor.call(this);
                 var size = arguments[0];
                 if (size instanceof Size) {
                     x = size.x;
                     y = size.y;
                 }
-                this.__x = x || 0;
-                this.__y = y || 0;
+                this.x = x || 0;
+                this.y = y || 0;
                 return this;
             }
         });
-        prime.define(Size.prototype, "x", {
-            set: function(value) {
-                if (this.__x !== value) {
-                    this.__x = value;
-                    this.emit("propertychange", "x", value);
-                }
-            },
-            get: function() {
-                return this.__x;
-            }
+        mixin(Size, Emitter);
+        mixin(Size, Properties);
+        Properties.define(Size, "x", {
+            value: 0
         });
-        prime.define(Size.prototype, "y", {
-            set: function(value) {
-                if (this.__y !== value) {
-                    this.__y = value;
-                    this.emit("propertychange", "y", value);
-                }
-            },
-            get: function() {
-                return this.__y;
-            }
+        Properties.define(Size, "y", {
+            value: 0
         });
-    },
-    m: function(require, module, exports, global) {
-        "use strict";
-        module.exports = require("n");
     },
     n: function(require, module, exports, global) {
+        "use strict";
+        module.exports = require("o");
+    },
+    o: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var array = require("4");
         var Emitter = require("9");
         var Rect = require("j");
-        var Size = require("l");
+        var Size = require("m");
         var Point = require("k");
-        var ViewStyle = require("o");
-        var ViewRenderer = require("p");
+        var ViewStyle = require("p");
+        var ViewRenderer = require("q");
         require("g");
         var View = module.exports = prime({
             inherits: Emitter,
@@ -1281,7 +1303,7 @@
             }
         });
     },
-    o: function(require, module, exports, global) {
+    p: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var array = require("4");
@@ -1352,14 +1374,14 @@
             }
         });
     },
-    p: function(require, module, exports, global) {
+    q: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var Map = require("8");
-        var requestFrame = require("q").request;
-        var cancelFrame = require("q").cancel;
+        var requestFrame = require("r").request;
+        var cancelFrame = require("r").cancel;
         var Rect = require("j");
-        var Size = require("l");
+        var Size = require("m");
         var Point = require("k");
         var Emitter = require("9");
         var buffers = new Map;
@@ -1484,7 +1506,7 @@
             redraws.remove(view);
         };
     },
-    q: function(require, module, exports, global) {
+    r: function(require, module, exports, global) {
         "use strict";
         var array = require("5");
         var requestFrame = global.requestAnimationFrame || global.webkitRequestAnimationFrame || global.mozRequestAnimationFrame || global.oRequestAnimationFrame || global.msRequestAnimationFrame || function(callback) {
@@ -1509,16 +1531,16 @@
         exports.request = request;
         exports.cancel = cancel;
     },
-    r: function(require, module, exports, global) {
-        "use strict";
-        module.exports = require("s");
-    },
     s: function(require, module, exports, global) {
+        "use strict";
+        module.exports = require("t");
+    },
+    t: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var array = require("4");
         var Emitter = require("9");
-        var View = require("m");
+        var View = require("n");
         var ViewController = module.exports = prime({
             inherits: Emitter,
             constructor: function() {
@@ -1554,7 +1576,7 @@
             }
         });
     },
-    t: function(require, module, exports, global) {
+    u: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var Point = require("k");
@@ -1590,7 +1612,7 @@
             }
         });
     },
-    u: function(require, module, exports, global) {
+    v: function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
         var array = require("4");
@@ -1609,15 +1631,15 @@
             }
         });
     },
-    v: function(require, module, exports, global) {
-        "use strict";
-        require("w");
-        require("y");
-        require("z");
-    },
     w: function(require, module, exports, global) {
         "use strict";
-        var storage = require("x").createStorage();
+        require("x");
+        require("z");
+        require("10");
+    },
+    x: function(require, module, exports, global) {
+        "use strict";
+        var storage = require("y").createStorage();
         var customs = {};
         var dispatchEvent = Element.prototype.dispatchEvent;
         var addEventListener = Element.prototype.addEventListener;
@@ -1745,7 +1767,7 @@
         };
         module.exports = global.defineCustomEvent = defineCustomEvent;
     },
-    x: function(require, module, exports, global) {
+    y: function(require, module, exports, global) {
         void function(global, undefined_, undefined) {
             var getProps = Object.getOwnPropertyNames, defProp = Object.defineProperty, toSource = Function.prototype.toString, create = Object.create, hasOwn = Object.prototype.hasOwnProperty, funcName = /^\n?function\s?(\w*)?_?\(/;
             function define(object, key, value) {
@@ -1911,9 +1933,9 @@
             if (global.WeakMap) global.WeakMap.createStorage = createStorage;
         }((0, eval)("this"));
     },
-    y: function(require, module, exports, global) {
+    z: function(require, module, exports, global) {
         "use strict";
-        var defineCustomEvent = require("w");
+        var defineCustomEvent = require("x");
         var elem = document.createElement("div");
         var base = null;
         var keys = {
@@ -1942,9 +1964,9 @@
             }
         });
     },
-    z: function(require, module, exports, global) {
+    "10": function(require, module, exports, global) {
         "use strict";
-        var defineCustomEvent = require("w");
+        var defineCustomEvent = require("x");
         var elem = document.createElement("div");
         var base = null;
         var keys = {
@@ -1972,12 +1994,12 @@
             }
         });
     },
-    "10": function(require, module, exports, global) {
-        "use strict";
-        require("11");
-        require("12");
-    },
     "11": function(require, module, exports, global) {
+        "use strict";
+        require("12");
+        require("13");
+    },
+    "12": function(require, module, exports, global) {
         "use strict";
         var hasTouchEvent = "ontouchstart" in global;
         var hasTouchList = "TouchList" in global;
@@ -2070,10 +2092,10 @@
             document.addEventListener("mouseup", onDocumentMouseUp);
         }
     },
-    "12": function(require, module, exports, global) {
+    "13": function(require, module, exports, global) {
         "use strict";
-        var map = require("x")();
-        var defineCustomEvent = require("w");
+        var map = require("y")();
+        var defineCustomEvent = require("x");
         var onDispatch = function(custom, data) {
             custom.view = data.view;
             custom.touches = data.touches;
@@ -2207,23 +2229,23 @@
             onRemove: detach("tapend", leave)
         }));
     },
-    "13": function(require, module, exports, global) {
-        "use strict";
-        module.exports = require("14");
-    },
     "14": function(require, module, exports, global) {
         "use strict";
-        var prime = require("3");
-        var array = require("4");
-        var View = require("m");
-        var Control = module.exports = prime({
-            inherits: View
-        });
+        module.exports = require("15");
     },
     "15": function(require, module, exports, global) {
         "use strict";
         var prime = require("3");
-        var Control = require("14");
+        var array = require("4");
+        var View = require("n");
+        var Control = module.exports = prime({
+            inherits: View
+        });
+    },
+    "16": function(require, module, exports, global) {
+        "use strict";
+        var prime = require("3");
+        var Control = require("15");
         var Button = module.exports = prime({
             inherits: Control,
             constructor: function() {
@@ -2257,9 +2279,9 @@
             }
         });
     },
-    "16": function(require, module, exports, global) {
+    "17": function(require, module, exports, global) {
         "use strict";
-        var prime = require("3"), requestFrame = require("q").request, bezier = require("17");
+        var prime = require("3"), requestFrame = require("r").request, bezier = require("18");
         var map = require("5").map;
         var sDuration = "([\\d.]+)(s|ms)?", sCubicBezier = "cubic-bezier\\(([-.\\d]+),([-.\\d]+),([-.\\d]+),([-.\\d]+)\\)";
         var rDuration = RegExp(sDuration), rCubicBezier = RegExp(sCubicBezier), rgCubicBezier = RegExp(sCubicBezier, "g");
@@ -2416,7 +2438,7 @@
         fx.prototype = Fx.prototype;
         module.exports = fx;
     },
-    "17": function(require, module, exports, global) {
+    "18": function(require, module, exports, global) {
         module.exports = function(x1, y1, x2, y2, epsilon) {
             var curveX = function(t) {
                 var v = 1 - t;
